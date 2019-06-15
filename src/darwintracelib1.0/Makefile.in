@@ -9,6 +9,7 @@ SRCS = \
 	access.c \
 	close.c \
 	darwintrace.c \
+	dtsharedmemory.c \
 	dup2.c \
 	mkdir.c \
 	open.c \
