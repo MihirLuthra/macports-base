@@ -48,7 +48,23 @@ namespace eval porttrace {
     # non-root installations, the current user, too). We're not prefixing the
     # path in /tmp with a separate macports-specific directory, because this
     # might not be writable by all users.
-    variable fifo_mktemp_template "/tmp/macports-trace-XXXXXX"
+    variable fifo_mktemp_template           "/tmp/macports-trace-XXXXXX"
+
+
+    ##
+    # dtsm is short for darwintrace shared memory
+    # These files are used as a communication medium between processes into which
+    # darwintrace library has been injected. 
+    variable dtsm_name
+    variable dtsm_status_name
+
+
+    ##
+    # mktemp(3) templates for shared memory file and its status file
+    #
+    variable dtsm_status_mktemp_template    "/tmp/macports-dtsm-status-XXXXXX"
+    variable dtsm_mktemp_template           "/tmp/macports-dtsm-XXXXXX"
+
 
     ##
     # The Tcl thread that runs the server side of trace mode and deals with
@@ -137,6 +153,12 @@ namespace eval porttrace {
         variable fifo
         variable fifo_mktemp_template
 
+        variable dtsm_name
+        variable dtsm_status_name
+
+        variable dtsm_status_mktemp_template
+        variable dtsm_mktemp_template
+
         if {[catch {package require Thread} error]} {
             ui_warn "Trace mode requires Tcl Thread package ($error)"
             return 0
@@ -149,6 +171,13 @@ namespace eval porttrace {
         # Make sure the socket doesn't exist yet (this would cause errors
         # later)
         file delete -force $fifo
+
+
+        # Generate a name for shared memory file and its status file
+        # through which processes into which darwintrace library is 
+        # injected processes can communicate
+        set dtsm_status_name [mktemp $dtsm_status_mktemp_template]
+        set dtsm_name        [mktemp $dtsm_mktemp_template       ]
 
         # Create the server-side of the trace socket; this will handle requests
         # from the traced processed.
@@ -165,7 +194,12 @@ namespace eval porttrace {
         }
         # Tell traced processes where to find their communication socket back
         # to this code.
-        set env(DARWINTRACE_LOG) $fifo
+        set env(DARWINTRACE_LOG)    $fifo
+
+        # Tell traced processes the file name to use as shared memory and status
+        set env(DTSM_STATUS_NAME)   $dtsm_status_name
+        set env(DTSM_NAME)          $dtsm_name                 
+
 
         # The sandbox is limited to:
         set trace_sandbox [list]
@@ -278,8 +312,10 @@ namespace eval porttrace {
             macosx_version
 
         variable fifo
+        variable dtsm_name
+        variable dtsm_status_name
 
-        foreach var {DYLD_INSERT_LIBRARIES DARWINTRACE_LOG} {
+        foreach var {DYLD_INSERT_LIBRARIES DARWINTRACE_LOG DTSM_NAME DTSM_STATUS_NAME } {
             array unset env $var
         }
 
@@ -288,6 +324,10 @@ namespace eval porttrace {
         tracelib clean
         # Delete the socket file
         file delete -force $fifo
+
+        # Delete the shared memory file and its status file
+        file delete -force $dtsm_status_name
+        file delete -force $dtsm_name
 
         # Delete the slave.
         delete_slave
