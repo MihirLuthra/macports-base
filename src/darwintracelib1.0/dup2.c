@@ -35,6 +35,7 @@
 
 #define DARWINTRACE_USE_PRIVATE_API 1
 #include "darwintrace.h"
+#include "dtsharedmemory.h"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -46,7 +47,7 @@
  * FDs are numbered in ascending order.
  */
 static int _dt_dup2(int filedes, int filedes2) {
-	__darwintrace_setup();
+
 
 	FILE *stream = __darwintrace_sock();
 	if (stream && filedes2 == fileno(stream)) {
@@ -67,6 +68,21 @@ static int _dt_dup2(int filedes, int filedes2) {
 		}
 		__darwintrace_sock_set(new_stream);
 	}
+
+
+    if(filedes2 == __dtsharedmemory_getStatusFileFd() || filedes2 == __dtsharedmemory_getSharedMemoryFileFd())
+    {
+        if(!__dtsharedmemory_reset_fd())
+        {
+            //if __dtsharedmemory_reset_fd() fails, do not allow overwriting either
+            //coz doing so will cause process to alter our fd and which may cause
+            //functions in dtsharedmemory.c to access offsets in memory that don't exist 
+            //causing seg faults and bus errors
+
+            fprintf(stderr, "dtsharedmemory.c : Failed to reset fd");
+            return -1;
+        }
+    }
 
 	return dup2(filedes, filedes2);
 }
