@@ -683,7 +683,7 @@ static inline bool __darwintrace_sandbox_check(const char *path, int flags) {
 
 	char command = -1;
 	char *t;
-    bool inserted_in_dtsm, path_permission, is_prefix;
+    bool inserted_in_dtsm;
 
     /*
      * insertions to shared memory cache need not be always successful.
@@ -696,16 +696,13 @@ static inline bool __darwintrace_sandbox_check(const char *path, int flags) {
 
 	if (path[0] == '/' && path[1] == '\0') {
 		// Always allow access to /. Strange things start to happen if you deny this.
-		
-        path_permission = true;
-        is_prefix = false;
 
         //Store in shared memory cache
-        inserted_in_dtsm = __dtsharedmemory_insert(path, path_permission, is_prefix);
+        inserted_in_dtsm = __dtsharedmemory_insert(path, ALLOW_PATH);
         if (!inserted_in_dtsm)
             debug_printf("__dtsharedmemory_insert() failed for path %s\n", path);
 
-        return path_permission;
+        return true;
 
 	}
 	 
@@ -717,33 +714,25 @@ static inline bool __darwintrace_sandbox_check(const char *path, int flags) {
 			switch (command) {
 				case FILEMAP_ALLOW:
 					
-                    is_prefix = true;
-    
-                    path_permission = true;
-                    
                     //Store in shared memory cache
-                    inserted_in_dtsm = __dtsharedmemory_insert(t, path_permission, is_prefix);
+                    inserted_in_dtsm = __dtsharedmemory_insert(t, ALLOW_PATH | IS_PREFIX);
                     if (!inserted_in_dtsm)
                         debug_printf("__dtsharedmemory_insert() failed for path prefix %s\n", t);
                     
-                    return path_permission;
+                    return true;
 
 				case FILEMAP_ASK:
-
-                    is_prefix = false;
 
 					// ask the socket whether this file is OK
 					switch (dependency_check(path)) {
 						case 1:
 						    
-                            path_permission = true;
-                            
                             //Store in shared memory cache
-                            inserted_in_dtsm = __dtsharedmemory_insert(path, path_permission, is_prefix);
+                            inserted_in_dtsm = __dtsharedmemory_insert(path, ALLOW_PATH);
 							if (!inserted_in_dtsm)
                                 debug_printf("__dtsharedmemory_insert() failed for path %s\n", path);
                             
-                            return path_permission;
+                            return true;
 
 						case -1:
 							// if the file isn't known to MacPorts, allow
@@ -752,14 +741,19 @@ static inline bool __darwintrace_sandbox_check(const char *path, int flags) {
 							if ((flags & DT_REPORT) > 0) {
 								__darwintrace_log_op("sandbox_unknown", path);
 							}
-							
-                            path_permission = true;
 
-                            inserted_in_dtsm = __dtsharedmemory_insert(path, path_permission, is_prefix);
+                            //If DT_REPORT wasn't specified, logging won't be done
+                            //If the same path is accessed later when DT_REPORT was specified,
+                            //this path has to get logged coz of which SANDBOX_UNKNOWN is specified
+							if ((flags & DT_REPORT) > 0)
+                                inserted_in_dtsm = __dtsharedmemory_insert(path, ALLOW_PATH);
+                            else
+                                inserted_in_dtsm = __dtsharedmemory_insert(path, ALLOW_PATH | SANDBOX_UNKNOWN);
+                            
                             if (!inserted_in_dtsm)
                                 debug_printf("__dtsharedmemory_insert() failed for path %s\n", path);
 							
-                            return path_permission;
+                            return true;
 
 						case 0:
 							// file belongs to a foreign port, deny access
@@ -767,31 +761,38 @@ static inline bool __darwintrace_sandbox_check(const char *path, int flags) {
 								__darwintrace_log_op("sandbox_violation", path);
 							}
 
-                            path_permission = false;
-
                             //Store in shared memory cache
-                            inserted_in_dtsm = __dtsharedmemory_insert(path, path_permission, is_prefix);
-                            if (!inserted_in_dtsm)
-                                debug_printf("__dtsharedmemory_insert() failed for path %s\n", path);
 
-                            return path_permission;
+                            //If DT_REPORT wasn't specified, logging won't be done
+                            //If the same path is accessed later when DT_REPORT was specified,
+                            //this path has to get logged coz of which SANDBOX_VIOLATION is specified
+                            
+                            if ((flags & DT_REPORT) > 0) 
+                                inserted_in_dtsm = __dtsharedmemory_insert(path, DENY_PATH);
+                            else
+                                inserted_in_dtsm = __dtsharedmemory_insert(path, DENY_PATH | SANDBOX_VIOLATION); 
+
+                            return false;
 							
 					}
 				case FILEMAP_DENY:
+
+
 					if ((flags & DT_REPORT) > 0) {
 						__darwintrace_log_op("sandbox_violation", path);
 					}
 
-                    is_prefix = true;
-    
-                    path_permission = false;
-
                     //Store in shared memory cache
-                    inserted_in_dtsm = __dtsharedmemory_insert(t, path_permission, is_prefix);
-                    if (!inserted_in_dtsm)
-                        debug_printf("__dtsharedmemory_insert() failed for path prefix %s\n", t);
                     
-                    return path_permission;
+                    //If DT_REPORT wasn't specified, logging won't be done
+                    //If the same path is accessed later when DT_REPORT was specified,
+                    //this path has to get logged coz of which SANDBOX_VIOLATION is specified
+                            
+                    if ((flags & DT_REPORT) > 0)
+                        inserted_in_dtsm = __dtsharedmemory_insert(path, DENY_PATH | IS_PREFIX);
+                    else
+                        inserted_in_dtsm = __dtsharedmemory_insert(path, DENY_PATH | IS_PREFIX | SANDBOX_VIOLATION);
+                    return false;
 
 				default:
 					fprintf(stderr, "darwintrace: error: unexpected byte in file map: `%x'\n", *t);
@@ -800,20 +801,26 @@ static inline bool __darwintrace_sandbox_check(const char *path, int flags) {
 		}
 	}
 
+
 	if ((flags & DT_REPORT) > 0) {
 		__darwintrace_log_op("sandbox_violation", path);
 	}
-	
-    path_permission = false;
-    
-    is_prefix = false;
 
     //Store in shared memory cache
-    inserted_in_dtsm = __dtsharedmemory_insert(path, path_permission, is_prefix);
+
+    //If DT_REPORT wasn't specified, logging won't be done
+    //If the same path is accessed later when DT_REPORT was specified,
+    //this path has to get logged coz of which SANDBOX_VIOLATION is specified
+
+    if ((flags & DT_REPORT) > 0)
+        inserted_in_dtsm = __dtsharedmemory_insert(path, DENY_PATH);
+    else
+        inserted_in_dtsm = __dtsharedmemory_insert(path, DENY_PATH | SANDBOX_VIOLATION);
+
     if (!inserted_in_dtsm)
         debug_printf("__dtsharedmemory_insert() failed for path %s\n", path);
     
-    return path_permission;
+    return false;
 }
 
 /**
@@ -844,9 +851,10 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 
         if (!filemap)
             return true;
-    }
+    }	
 
-    bool found_in_dtsm, path_permission;
+    bool found_in_dtsm = false, dt_path_permission;
+    uint8_t dtsm_flags;
 
 	typedef struct {
 		char *start;
@@ -1088,13 +1096,34 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 		if (lstat(normPath, &st) != -1 && S_ISLNK(st.st_mode)) {
 
             //Check shared memory for path
-            found_in_dtsm = __dtsharedmemory_search(normPath, &path_permission);
+            if (did_set_dtsm_manager)
+				found_in_dtsm = __dtsharedmemory_search(normPath, &dtsm_flags);
  
 #if DTSM_DEBUG && 1
             found_in_dtsm ? fprintf(stderr, "found_in_dtsm=true\n") : fprintf(stderr, "found_in_dtsm=false for %s\n", normPath);
 #endif
 
-            if (!found_in_dtsm)
+            if (found_in_dtsm)
+            {
+                dt_path_permission = (dtsm_flags & ALLOW_PATH) ? true : false;
+               
+                if ((flags & DT_REPORT) > 0) 
+                {
+                    if (dtsm_flags & SANDBOX_VIOLATION)
+                    {
+                        __darwintrace_setup();
+                        __darwintrace_log_op("sandbox_violation", normPath);
+                    }
+                    else
+                    if (dtsm_flags & SANDBOX_UNKNOWN)
+                    {
+                        __darwintrace_setup();
+                        __darwintrace_log_op("sandbox_unknown", normPath);
+                    }
+                }
+                
+            }
+            else
             //Not found in shared memory cache, ask the server
             {
                 __darwintrace_setup();
@@ -1102,10 +1131,10 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
                 if (!filemap)
                     return true;
 
-			    path_permission = __darwintrace_sandbox_check(normPath, flags);
+                dt_path_permission = __darwintrace_sandbox_check(normPath, flags);
             }
 
-            if (!path_permission)
+            if (!dt_path_permission)
                 return false;
 
 			char link[MAXPATHLEN];
@@ -1182,13 +1211,33 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 	} while (pathIsSymlink);
 
     //Check shared memory cache for path
-    found_in_dtsm = __dtsharedmemory_search(normPath, &path_permission);
+    if (did_set_dtsm_manager)
+		found_in_dtsm = __dtsharedmemory_search(normPath, &dtsm_flags);
  
 #if DTSM_DEBUG && 1
     found_in_dtsm ? fprintf(stderr, "found_in_dtsm=true\n") : fprintf(stderr, "found_in_dtsm=false for %s\n", normPath);
 #endif
 
-    if (!found_in_dtsm)
+    if (found_in_dtsm)
+    {
+        dt_path_permission = (dtsm_flags & ALLOW_PATH) ? true : false;
+
+        if ((flags & DT_REPORT) > 0)
+        {   
+            if (dtsm_flags & SANDBOX_VIOLATION)
+            {   
+                __darwintrace_setup();
+                __darwintrace_log_op("sandbox_violation", normPath);
+            }
+            else
+            if (dtsm_flags & SANDBOX_UNKNOWN)
+            {   
+                __darwintrace_setup();
+                __darwintrace_log_op("sandbox_unknown", normPath);
+            }
+        }
+    }
+    else
     //Not found in shared memory, ask the server
     {
         __darwintrace_setup();
@@ -1196,8 +1245,8 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
         if (!filemap)
             return true;
 
-        path_permission = __darwintrace_sandbox_check(normPath, flags);
+        dt_path_permission = __darwintrace_sandbox_check(normPath, flags);
     }
 
-	return path_permission;
+	return dt_path_permission;
 }

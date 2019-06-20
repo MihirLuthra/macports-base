@@ -1,3 +1,37 @@
+/* vim: set et sw=4 ts=4 sts=4: */
+/*
+ * dtsharedmemory.h
+ *
+ * Copyright (c) 2019 The MacPorts Project
+ * Copyright (c) 2019 Mihir Luthra <1999mihir.luthra@gmail.com>,
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of The MacPorts Project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+
+
 #include <stdbool.h>
 #include <errno.h>
 #include <stdio.h>
@@ -20,7 +54,7 @@
 //take INITIAL_FILE_SIZE big enough such that expansion isn't needed
 
 
-//If printing location is stderr, it can cause conflicts with port installation and crash.
+//If printing location is stderr, it can cause conflicts with build.
 #define	DEBUG_MESSAGES_ALLOWED 	(0)
 
 
@@ -33,9 +67,9 @@
 
 //{{{{{{{{{{{{{{{{{{{{{{{{{{
 #if (DEBUG_MESSAGES_ALLOWED && 1) && (DEBUG_PRINT_MESSAGES && 1)
-#define print_error(errorDescription) fprintf(stderr, "\n%s : func(%s) : %s : %s\n\n", __FILE__, __func__, errorDescription, strerror(errno));
+		#define print_error(errorDescription) fprintf(stderr, "%s : func(%s) : %s : %s\n", __FILE__, __func__, errorDescription, strerror(errno));
 #else
-#define print_error(errorDescription)
+		#define print_error(errorDescription)
 #endif
 //}}}}}}}}}}}}}}}}}}}}}}}}}}
 
@@ -44,18 +78,18 @@
 //{{{{{{{{{{{{{{{{{{{{{{{{{{
 #if (DEBUG_MESSAGES_ALLOWED && 1) && (DEBUG_FAIL_MESSAGES && 1)
 
-#define FAIL_IF(condition, message, returnVal) \
-    if((condition)){\
-        fprintf(stderr, "\n%s : func(%s) : %s : %s\n\n", __FILE__, __func__, message, strerror(errno));\
-        return returnVal;\
-    }
+	#define FAIL_IF(condition, message, returnVal) \
+	if((condition)){\
+		fprintf(stderr, "%s : func(%s) : %s : %s\n", __FILE__, __func__, message, strerror(errno));\
+		return returnVal;\
+	}
 
 #else
 
-#define FAIL_IF(condition, message, returnVal) \
-    if((condition)){\
-        return returnVal;\
-    }
+	#define FAIL_IF(condition, message, returnVal) \
+	if((condition)){\
+		return returnVal;\
+	}
 
 #endif
 //}}}}}}}}}}}}}}}}}}}}}}}}}}
@@ -83,7 +117,6 @@
  *	size_t is being used as data type of bitmap because it gets
  *	largest possible unsigned integer (32 bit or 64 bit).
  **/
-
 #ifdef __LP64__
 #	define NO_OF_BITS 64
 #else
@@ -100,16 +133,17 @@
 
 /*
  *	EXPANDING_SIZE should be big enough such that newSize is never made less than
- *	the current file size by ftruncate(2) and will also cause other problems.
+ *	the current file size by truncate(2) and will also cause other problems.
  *
  *	After testing till now, at least 20 MB expanding size seems necessary for the library
- *	to function correctly.
+ *	to function correctly. 
  *
  */
-#define INITIAL_FILE_SIZE 	MB(10) //Keep it greater than sizeof(CNode)+sizeof(INode)
+#define INITIAL_FILE_SIZE 	MB(20) //Keep it greater than sizeof(CNode)+sizeof(INode)
 
-#define EXPANDING_SIZE 		MB(20)
-
+#define EXPANDING_SIZE 		(MB(10) * sysconf(_SC_NPROCESSORS_ONLN))
+//EXPANDING_SIZE should vary accordingly with number of processors and processing speed.
+//The bigger factor is number of processors, which has been considered above.
 
 
 struct SharedMemoryStatus;
@@ -141,7 +175,7 @@ struct SharedMemoryStatus;
  *
  */
 struct SharedMemoryManager{
-	
+
 	//shared memory file
 	void *			sharedMemoryFile_mmap_base;
 	size_t  		sharedMemoryFile_mapping_size;
@@ -156,6 +190,16 @@ struct SharedMemoryManager{
 };
 
 
+
+#define DUMP_YARD_SIZE 64
+
+/*
+ *	The bitmap may need to store more than NO_OF_BITS bits. A size_t can only store
+ *	mapping for max system bits. So to make it possible to store more than NO_OF_BITS bit,
+ *	an array of such size_t is created whose size is given by DUMP_YARD_BITMAP_ARRAY_SIZE.
+ */
+#define DUMP_YARD_BITMAP_ARRAY_SIZE \
+((DUMP_YARD_SIZE % NO_OF_BITS == 0) ? DUMP_YARD_SIZE/NO_OF_BITS : ((DUMP_YARD_SIZE/NO_OF_BITS) + 1))
 
 /**
  *	#Member1(writeFromOffset):
@@ -223,16 +267,11 @@ struct SharedMemoryManager{
  *	"6MB" when using dumping and recycling.
  *
  **/
-#define DUMP_YARD_SIZE 64
-
-#define DUMP_YARD_BITMAP_ARRAY_SIZE \
-((DUMP_YARD_SIZE % NO_OF_BITS == 0) ? DUMP_YARD_SIZE/NO_OF_BITS : ((DUMP_YARD_SIZE/NO_OF_BITS) + 1))
-
 struct SharedMemoryStatus
 {
 	
 #if !(DISABLE_DUMPING_AND_RECYCLING)
-	//{
+//{
 	size_t wastedMemoryDumpYard [DUMP_YARD_SIZE];
 	size_t parentINodesOfDumper [DUMP_YARD_SIZE];
 	
@@ -253,12 +292,12 @@ struct SharedMemoryStatus
 		size_t 			bitmapForRecycling	 [DUMP_YARD_BITMAP_ARRAY_SIZE];
 	//}
 #	endif
-	
-	//}
-	
+
+//}
+
 #else
-	//{
-	
+//{
+
 #	ifdef HAVE_STDATOMIC_H
 	//{
 		_Atomic(size_t) writeFromOffset;
@@ -270,8 +309,8 @@ struct SharedMemoryStatus
 		size_t 			sharedMemoryFileSize;
 	//}
 #	endif
-	
-	//}
+
+//}
 #endif
 	
 };
@@ -324,7 +363,7 @@ typedef struct INode{
 #ifdef HAVE_STDATOMIC_H
 	_Atomic(size_t) mainNode;
 #else
-	size_t mainNode;
+	size_t 			mainNode;
 #endif
 	
 }INode;
@@ -332,67 +371,35 @@ typedef struct INode{
 
 /*
  *	POSSIBLE_CHARACTERS specify the variety of characters a file name can have.
- *	Paths don't use ascii chars 0-31 and 123-256 generally, so no use of making such big nodes
+ *	Paths don't use ascii chars 0-31 and 128-256 generally, so no use of making such big nodes
  *	for rare cases. Bigger size of CNode means more time taken for insertion and also
- *	shared memory expands really fast.
- *	Characters 97-122 are lowercase alphabets. In macOS, pathnames are case-insensitive,
- *	so before insertion and search, all lowercase are converted into uppercase.
- *	This reduces array size in CNode by 26.
- *
- *	UPDATE: Can be different file systems, not a good idea to assume case-insensitiveness.
+ *	shared memory expands comparitively fast.
  */
-#define LOWER_LIMIT 32 //inclusive
-#define UPPER_LIMIT 122 //inclusive
+#define LOWER_LIMIT 32	//inclusive
+#define UPPER_LIMIT 122	//inclusive
 #define POSSIBLE_CHARACTERS (UPPER_LIMIT - LOWER_LIMIT + 1) //The array size
-
 
 
 #if UPPER_LIMIT <= LOWER_LIMIT
 #	error 	Invalid range of possible characters.\
-    Reset UPPER_LIMIT and LOWER_LIMIT values.
+			Reset UPPER_LIMIT and LOWER_LIMIT values.
 #endif
-
-
-/*
- *	The bitmap may need to store more than NO_OF_BITS bits. A size_t can only store
- *	mapping for max system bits. So to make it possible to store more than NO_OF_BITS bit,
- *	an array of such size_t is created whose size is given by BITMAP_ARRAY_SIZE.
- *
- *	The code in between is commented coz we will always need to keep an extra bit for
- *	prefix indicator.(see __dtsharedmemory_insert()), although see the line as a whole to
- *	understand it.
- */
-#define BITMAP_ARRAY_SIZE  (/*(POSSIBLE_CHARACTERS % NO_OF_BITS == 0) ? POSSIBLE_CHARACTERS/NO_OF_BITS : */((POSSIBLE_CHARACTERS/NO_OF_BITS) + 1))
 
 
 
 /**
  *
- *	#Member1(bitmap):
- *		An array of size_t.
- *		Depending on how big the possibilities array is, BITMAP_ARRAY_SIZE is decided.
- *		e.g., If possibilities array contains 256 elements,
- *		BITMAP_ARRAY_SIZE = 4
- *		A single element of this array stores the status of 64 possibilities.
- *		The use of bitmap makes it easy and faster to make checks.
- *		If bitmap weren't there, it would have become clumsy and time taking to
- *		initialise every possibilty by a null value whereas use of bitmap makes
- *		it simpler.
- *
- *	#Member2(possibilities):
+ *	#Member1(possibilities):
  *		This array stores offsets to next INodes for every possibility.
  *
- *	#Member3(endOfString):
+ *	#Member2(endOfString):
  *		Is set true when a node needs to represent end of string.
  *
- *	#Member4(pathPermission):
- *		This is only checked when endOfString is true.
- *		If pathPermission is true, access should be allowed otherwise it should be denied.
+ *	#Member3(flags):
+ *		These tells charactersistics associated with the path that has been inserted.
  *
  **/
 typedef struct CNode{
-	
-	size_t 	bitmap				[BITMAP_ARRAY_SIZE];
 	
 #if (LARGE_MEMORY_NEEDED && 1)
 	size_t		possibilities	[POSSIBLE_CHARACTERS];
@@ -400,8 +407,8 @@ typedef struct CNode{
 	uint32_t 	possibilities	[POSSIBLE_CHARACTERS];
 #endif
 	
-	bool 	isEndOfString;
-	bool 	pathPermission;
+	bool 		isEndOfString;
+	uint8_t		flags;
 	
 }CNode;
 
@@ -416,8 +423,43 @@ typedef struct CNode{
 
 
 /**
+ *	ALLOW_PATH
+ *		Path should be allowed access.
  *
- *	This function inserts a string `path` along with `pathPermission` into the shared memory.
+ *	DENY_PATH
+ *		Path should be denied access.
+ *
+ *	SANDBOX_VIOLATION
+ *		This is a path to a file that belongs to a foreign port.
+ *		For logging purposes in darwintrace.c
+ *
+ *	SANDBOX_UNKNOWN
+ *		This is a path to a file which is not known to macports.
+ *		For logging purposes in darwintrace.c
+ *
+ *	IS_PREFIX
+ *		Path being inserted is a prefix, i.e., all paths with
+ *		this prefix are treated same way.
+ *		e.g., If "/bin" is inserted with this flag,
+ *		and then a search is made for "/bin/ls", the search will succeed
+ *		and path characteristics of "/bin" will be returned.
+ *		Also these are specifically path prefixes and won't work as a
+ *		general prefix, like search for "/binabc" will fail.
+ **/
+enum
+{
+	ALLOW_PATH			= (uint8_t) 1 << 0,
+	DENY_PATH			= (uint8_t) 1 << 1,
+	SANDBOX_VIOLATION	= (uint8_t) 1 << 2,
+	SANDBOX_UNKNOWN		= (uint8_t) 1 << 3,
+	IS_PREFIX			= (uint8_t) 1 << 4
+};
+
+
+
+/**
+ *
+ *	This function inserts a string `path` along with `flags` into the shared memory.
  *	If insertion is successful, it returns true else false.
  *	The shared memory follows a ctrie data structure. Although it doesn't implement
  *	tomb nodes due to lack of need to remove nodes.
@@ -427,24 +469,18 @@ typedef struct CNode{
  *	#Arg1(path):
  *		Path to be inserted into shared memory.
  *
- *	#Arg2(pathPermission):
- *		true implies path should be allowed
- *		false implies path should be denied
+ *	#Arg2(flags):
+ *		Tell the characteristics of the path getting inserted.
  *
- *  #Arg3(isPrefix):
- *      This indicates that the path getting inserted should
- *      be treated as a prefix and all path with this prefix, if searched,
- *      are considered as found.
  *
  **/
-bool __dtsharedmemory_insert(const char *path, bool pathPermission, bool isPrefix);
-
+bool __dtsharedmemory_insert(const char *path, uint8_t flags);
 
 
 /**
  *
  *	This function searches for a string `path` in the shared memory.
- *	If found it returns true and sets the value of `pathPermission`. Otherwise,
+ *	If found it returns true and sets the value of `flags`. Otherwise,
  *	it returns false.
  *	The shared memory follows a ctrie data structure. Although it doesn't implement
  *	tomb nodes due to lack of need to remove nodes.
@@ -454,14 +490,12 @@ bool __dtsharedmemory_insert(const char *path, bool pathPermission, bool isPrefi
  *	#Arg1(path):
  *		Path to be searched in shared memory.
  *
- *	#Arg2(pathPermission):
- *		This argument has to be passed by reference because the path permission
- *		would be returned in it.
- *		true implies path should be allowed
- *		false implies path should be denied
+ *	#Arg2(flags):
+ *		Tells the characteristics of the path. This argument needs to be passed
+ *		by address to get characteristcis associated with the path.
  *
  **/
-bool __dtsharedmemory_search(const char *path, bool *pathPermission);
+bool __dtsharedmemory_search(const char *path, uint8_t *flags);
 
 
 
@@ -471,9 +505,19 @@ bool __dtsharedmemory_search(const char *path, bool *pathPermission);
  *	the file descriptor that is being used by either status file or
  *	shared memory file via dup2(2). Each process has a unique file descriptor
  *	for each of these files which is used throughout the process.
- *	If while installing the port, it calls dup2(2) and tries to use this fd,
- *	this function will make the process to reset the fd that we are using and
- *	let it take our old fd.
+ *	If while installing the port, an attempt is being made to use our fds via 
+ *	dup2(2) or close(2) tries to close our fd, this function resets the fd being used by 
+ *	status and shared memory file and the port can use the fd we were using before.
+ *	Although there always will be a chance of us or port using the wrong fd ,like ,
+ *	the fd has just been prepared by open(2) in __dtsharedmemory_set_manager() or
+ *	__dtsharedmemory_reset_fd() and currently the Global(manager) doesn't know about it.
+ *	In such a case the process may use that fd and problem may occur. This case has never occured
+ *	with me while testing but is theoritically possible. 
+ *	TODO: A possible idea to fix this completely would be to keep some unique string in the start
+ *	of the file which is checked after open(2) opens the file. In case when the file is first created,
+ *	we can call fcntl() with F_GETPATH to check if the right file is opened. The F_GETPATH trick can be
+ *	done always but want to keep sys calls as low as possible and optimisation to the max.
+ *	Still thinking of better solutions.
  *
  **/
 bool __dtsharedmemory_reset_fd();
