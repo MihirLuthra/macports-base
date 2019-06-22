@@ -49,7 +49,7 @@
  * will be set to the FD to be closed when closing should be allowed.
  */
 static int _dt_close(int fd) {
-
+	
 	FILE *stream = __darwintrace_sock();
 	if (stream) {
 		int dtsock = fileno(stream);
@@ -58,18 +58,19 @@ static int _dt_close(int fd) {
 			return -1;
 		}
 	}
-
-
-    if(fd == __dtsharedmemory_getStatusFileFd() || fd == __dtsharedmemory_getSharedMemoryFileFd())
-    {
-        //Not resetting fd would causes errors in port autoconf
-        if(!__dtsharedmemory_reset_fd())
-        {
-            errno = EBADF;
-            return -1;
-        }
-    }
-
+	
+	
+	if(fd == __dtsharedmemory_getStatusFileFd() || fd == __dtsharedmemory_getSharedMemoryFileFd())
+	{
+		//Not resetting fd would causes errors in port autoconf
+		if(!__dtsharedmemory_reset_fd())
+		{
+			fprintf(__darwintrace_stderr, "close.c : Failed to reset fd for dtsm files");
+			errno = EBADF;
+			return -1;
+		}
+	}
+	
 	return close(fd);
 }
 

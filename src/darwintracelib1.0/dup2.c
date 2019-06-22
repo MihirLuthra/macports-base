@@ -47,20 +47,20 @@
  * FDs are numbered in ascending order.
  */
 static int _dt_dup2(int filedes, int filedes2) {
-
-
+	
+	
 	FILE *stream = __darwintrace_sock();
 	if (stream && filedes2 == fileno(stream)) {
 		// if somebody tries to close our file descriptor, just move it out of
 		// the way. Make sure it doesn't end up as stdin/stdout/stderr, though!
 		int new_darwintrace_fd;
 		FILE *new_stream;
-
+		
 		if (-1 == (new_darwintrace_fd = fcntl(fileno(stream), F_DUPFD, STDOUT_FILENO + 1))) {
 			// if duplicating fails, do not allow overwriting either!
 			return -1;
 		}
-
+		
 		__darwintrace_close();
 		if (NULL == (new_stream = fdopen(new_darwintrace_fd, "a+"))) {
 			perror("darwintrace: fdopen");
@@ -68,22 +68,22 @@ static int _dt_dup2(int filedes, int filedes2) {
 		}
 		__darwintrace_sock_set(new_stream);
 	}
-
-
-    if(filedes2 == __dtsharedmemory_getStatusFileFd() || filedes2 == __dtsharedmemory_getSharedMemoryFileFd())
-    {
-        if(!__dtsharedmemory_reset_fd())
-        {
-            //if __dtsharedmemory_reset_fd() fails, do not allow overwriting either
-            //coz doing so will cause process to alter our fd and which may cause
-            //functions in dtsharedmemory.c to access offsets in memory that don't exist 
-            //causing seg faults and bus errors
-
-            fprintf(stderr, "dtsharedmemory.c : Failed to reset fd");
-            return -1;
-        }
-    }
-
+	
+	
+	if(filedes2 == __dtsharedmemory_getStatusFileFd() || filedes2 == __dtsharedmemory_getSharedMemoryFileFd())
+	{
+		if(!__dtsharedmemory_reset_fd())
+		{
+			//if __dtsharedmemory_reset_fd() fails, do not allow overwriting either
+			//coz doing so will cause process to alter our fd and which may cause
+			//functions in dtsharedmemory.c to access offsets in memory that don't exist
+			//causing seg faults and bus errors
+			
+			fprintf(__darwintrace_stderr, "dup2.c : Failed to reset fd for dtsm files");
+			return -1;
+		}
+	}
+	
 	return dup2(filedes, filedes2);
 }
 

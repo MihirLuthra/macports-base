@@ -81,7 +81,7 @@ static char *__env_full_darwintrace_log;
 
 
 /**
- * Copy of the DTSM_STATUS_NAME environment variable to restore it in execve(2).
+ * Copy of the DARWINTRACE_SM_STATUS_NAME environment variable to restore it in execve(2).
  * Contains the path of shared memory status file. Since this variable is also used from
  * darwintrace.c, is can not be static.
  */
@@ -90,7 +90,7 @@ static char *__env_full_dtsm_status_name;
 
 
 /**
- * Copy of the DTSM_NAME environment variable to restore it in execve(2).
+ * Copy of the DARWINTRACE_SM_NAME environment variable to restore it in execve(2).
  * Contains the path of shared memory file. Since this variable is also used from
  * darwintrace.c, is can not be static.
  */
@@ -126,8 +126,8 @@ static void store_env() {
 	COPYENV(DYLD_FORCE_FLAT_NAMESPACE, __env_full_dyld_force_flat_namespace, __env_dyld_force_flat_namespace);
 	COPYENV(DARWINTRACE_LOG, __env_full_darwintrace_log, __env_darwintrace_log);
 
-    COPYENV(DTSM_STATUS_NAME, __env_full_dtsm_status_name, __env_dtsm_status_name);
-	COPYENV(DTSM_NAME, __env_full_dtsm_name, __env_dtsm_name);
+	COPYENV(DARWINTRACE_SM_STATUS_NAME, __env_full_dtsm_status_name, __env_dtsm_status_name);
+	COPYENV(DARWINTRACE_SM_NAME, __env_full_dtsm_name, __env_dtsm_name);
 
 #undef COPYENV
 
@@ -163,27 +163,27 @@ static inline char **restore_env(char *const envp[]) {
 	char *dyld_insert_libraries_ptr     = __env_full_dyld_insert_libraries;
 	char *dyld_force_flat_namespace_ptr = __env_full_dyld_force_flat_namespace;
 	char *darwintrace_log_ptr           = __env_full_darwintrace_log;
-
-    char *dtsm_status_name_ptr          = __env_full_dtsm_status_name;
-    char *dtsm_name_ptr                 = __env_full_dtsm_name;
-
-
+	
+	char *dtsm_status_name_ptr          = __env_full_dtsm_status_name;
+	char *dtsm_name_ptr                 = __env_full_dtsm_name;
+	
+	
 	char *const *enviter = envp;
 	size_t envlen = 0;
 	char **copy;
 	char **copyiter;
-
+	
 	while (enviter != NULL && *enviter != NULL) {
 		envlen++;
 		enviter++;
 	}
-
+	
 	// 6 is sufficient for the five variables we copy and the terminator
 	copy = malloc(sizeof(char *) * (envlen + 6));
-
+	
 	enviter  = envp;
 	copyiter = copy;
-
+	
 	while (enviter != NULL && *enviter != NULL) {
 		char *val = *enviter;
 		if (__darwintrace_strbeginswith(val, "DYLD_INSERT_LIBRARIES=")) {
@@ -195,21 +195,21 @@ static inline char **restore_env(char *const envp[]) {
 		} else if (__darwintrace_strbeginswith(val, "DARWINTRACE_LOG=")) {
 			val = darwintrace_log_ptr;
 			darwintrace_log_ptr = NULL;
-		} else if (__darwintrace_strbeginswith(val, "DTSM_STATUS_NAME=")) {
-            val = dtsm_status_name_ptr;
-            dtsm_status_name_ptr = NULL;
-        } else if (__darwintrace_strbeginswith(val, "DTSM_NAME=")) {
-            val = dtsm_name_ptr;
-            dtsm_name_ptr = NULL;
-        }
-
+		} else if (__darwintrace_strbeginswith(val, "DARWINTRACE_SM_STATUS_NAME=")) {
+			val = dtsm_status_name_ptr;
+			dtsm_status_name_ptr = NULL;
+		} else if (__darwintrace_strbeginswith(val, "DARWINTRACE_SM_NAME=")) {
+			val = dtsm_name_ptr;
+			dtsm_name_ptr = NULL;
+		}
+		
 		if (val) {
 			*copyiter++ = val;
 		}
-
+		
 		enviter++;
 	}
-
+	
 	if (dyld_insert_libraries_ptr) {
 		*copyiter++ = dyld_insert_libraries_ptr;
 	}
@@ -219,15 +219,15 @@ static inline char **restore_env(char *const envp[]) {
 	if (darwintrace_log_ptr) {
 		*copyiter++ = darwintrace_log_ptr;
 	}
-    if (dtsm_status_name_ptr) {
-        *copyiter++ = dtsm_status_name_ptr;
-    }
-    if (dtsm_name_ptr) {
-        *copyiter++ = dtsm_name_ptr;
-    }
-
+	if (dtsm_status_name_ptr) {
+		*copyiter++ = dtsm_status_name_ptr;
+	}
+	if (dtsm_name_ptr) {
+		*copyiter++ = dtsm_name_ptr;
+	}
+	
 	*copyiter = 0;
-
+	
 	return copy;
 }
 

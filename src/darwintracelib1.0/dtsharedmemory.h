@@ -1,4 +1,3 @@
-/* vim: set et sw=4 ts=4 sts=4: */
 /*
  * dtsharedmemory.h
  *
@@ -17,7 +16,7 @@
  * 3. Neither the name of The MacPorts Project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -36,6 +35,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <darwintrace.h>
 
 
 #ifdef HAVE_CONFIG_H
@@ -48,51 +48,51 @@
 
 
 //For debugging purposes
-#define DISABLE_DUMPING_AND_RECYCLING 	(0)
-#define DISABLE_MEMORY_EXPANSION 		(0)
+#define DISABLE_DUMPING_AND_RECYCLING (0)
+#define DISABLE_MEMORY_EXPANSION      (0)
 //Instead of disabling DISABLE_MEMORY_EXPANSION, a better idea is to
 //take INITIAL_FILE_SIZE big enough such that expansion isn't needed
 
 
-//If printing location is stderr, it can cause conflicts with build.
-#define	DEBUG_MESSAGES_ALLOWED 	(0)
+//If __darwintrace_stderr is set as stderr, it can cause conflicts with installation.
+//See proc.c
+#define	DEBUG_MESSAGES_ALLOWED (0)
 
 
 //To debug any of them , just make them 1
 //If DEBUG_MESSAGES_ALLOWED is not 1, none of these flags get debugged even if they are 1.
-#define	DEBUG_PRINT_MESSAGES 	(1)
-#define	DEBUG_FAIL_MESSAGES		(1)
+#define	DEBUG_PRINT_MESSAGES (1)
+#define	DEBUG_FAIL_MESSAGES  (1)
 
 
 
-//{{{{{{{{{{{{{{{{{{{{{{{{{{
+
 #if (DEBUG_MESSAGES_ALLOWED && 1) && (DEBUG_PRINT_MESSAGES && 1)
-		#define print_error(errorDescription) fprintf(stderr, "%s : func(%s) : %s : %s\n", __FILE__, __func__, errorDescription, strerror(errno));
+#	define print_error(errorDescription) fprintf(__darwintrace_stderr, "%s : func(%s) : %s : %s\n", __FILE__, __func__, errorDescription, strerror(errno));
 #else
-		#define print_error(errorDescription)
+#	define print_error(errorDescription)
 #endif
-//}}}}}}}}}}}}}}}}}}}}}}}}}}
 
 
 
-//{{{{{{{{{{{{{{{{{{{{{{{{{{
 #if (DEBUG_MESSAGES_ALLOWED && 1) && (DEBUG_FAIL_MESSAGES && 1)
-
-	#define FAIL_IF(condition, message, returnVal) \
-	if((condition)){\
-		fprintf(stderr, "%s : func(%s) : %s : %s\n", __FILE__, __func__, message, strerror(errno));\
-		return returnVal;\
-	}
+/*Empty comments are placed all over to avoid crazy indentation caused by auto-indent on macro definitions*/
+#	define FAIL_IF(condition, message, returnVal) \
+\
+/**/	if((condition)){\
+/**/		fprintf(__darwintrace_stderr, "%s : func(%s) : %s : %s\n", __FILE__, __func__, message, strerror(errno));\
+/**/		return returnVal;\
+/**/	}
 
 #else
 
-	#define FAIL_IF(condition, message, returnVal) \
-	if((condition)){\
-		return returnVal;\
-	}
+#	define FAIL_IF(condition, message, returnVal) \
+/**/	if((condition)){\
+/**/		return returnVal;\
+/**/	}
 
 #endif
-//}}}}}}}}}}}}}}}}}}}}}}}}}}
+
 
 
 
@@ -136,12 +136,12 @@
  *	the current file size by truncate(2) and will also cause other problems.
  *
  *	After testing till now, at least 20 MB expanding size seems necessary for the library
- *	to function correctly. 
+ *	to function correctly.
  *
  */
-#define INITIAL_FILE_SIZE 	MB(20) //Keep it greater than sizeof(CNode)+sizeof(INode)
+#define INITIAL_FILE_SIZE  MB(20) //Keep it greater than sizeof(CNode)+sizeof(INode)
 
-#define EXPANDING_SIZE 		(MB(10) * sysconf(_SC_NPROCESSORS_ONLN))
+#define EXPANDING_SIZE    (MB(10) * sysconf(_SC_NPROCESSORS_ONLN))
 //EXPANDING_SIZE should vary accordingly with number of processors and processing speed.
 //The bigger factor is number of processors, which has been considered above.
 
@@ -175,17 +175,17 @@ struct SharedMemoryStatus;
  *
  */
 struct SharedMemoryManager{
-
+	
 	//shared memory file
-	void *			sharedMemoryFile_mmap_base;
-	size_t  		sharedMemoryFile_mapping_size;
-	const char * 	sharedMemoryFile_name;
-	int 			sharedMemoryFile_fd;
+	void *       sharedMemoryFile_mmap_base;
+	size_t       sharedMemoryFile_mapping_size;
+	const char * sharedMemoryFile_name;
+	int          sharedMemoryFile_fd;
 	
 	//status file
-	struct	SharedMemoryStatus *	statusFile_mmap_base;
-	int								statusFile_fd;
-	const char *					statusFile_name;
+	struct	SharedMemoryStatus * statusFile_mmap_base;
+	int                          statusFile_fd;
+	const char *                 statusFile_name;
 	
 };
 
@@ -271,46 +271,46 @@ struct SharedMemoryStatus
 {
 	
 #if !(DISABLE_DUMPING_AND_RECYCLING)
-//{
+
 	size_t wastedMemoryDumpYard [DUMP_YARD_SIZE];
 	size_t parentINodesOfDumper [DUMP_YARD_SIZE];
 	
 #	ifdef HAVE_STDATOMIC_H
-	//{
-		_Atomic(size_t) writeFromOffset;
-		_Atomic(size_t) sharedMemoryFileSize;
 	
-		_Atomic(size_t) bitmapForDumping	 [DUMP_YARD_BITMAP_ARRAY_SIZE];
-		_Atomic(size_t) bitmapForRecycling	 [DUMP_YARD_BITMAP_ARRAY_SIZE];
-	//}
+	_Atomic(size_t) writeFromOffset;
+	_Atomic(size_t) sharedMemoryFileSize;
+	
+	_Atomic(size_t) bitmapForDumping      [DUMP_YARD_BITMAP_ARRAY_SIZE];
+	_Atomic(size_t) bitmapForRecycling    [DUMP_YARD_BITMAP_ARRAY_SIZE];
+	
 #	else
-	//{
-		size_t 			writeFromOffset;
-		size_t 			sharedMemoryFileSize;
 	
-		size_t 			bitmapForDumping	 [DUMP_YARD_BITMAP_ARRAY_SIZE];
-		size_t 			bitmapForRecycling	 [DUMP_YARD_BITMAP_ARRAY_SIZE];
-	//}
+	size_t          writeFromOffset;
+	size_t          sharedMemoryFileSize;
+	
+	size_t          bitmapForDumping      [DUMP_YARD_BITMAP_ARRAY_SIZE];
+	size_t          bitmapForRecycling    [DUMP_YARD_BITMAP_ARRAY_SIZE];
+	
 #	endif
+	
 
-//}
-
+	
 #else
-//{
 
+	
 #	ifdef HAVE_STDATOMIC_H
-	//{
-		_Atomic(size_t) writeFromOffset;
-		_Atomic(size_t)	sharedMemoryFileSize;
-	//}
+	
+	_Atomic(size_t) writeFromOffset;
+	_Atomic(size_t)	sharedMemoryFileSize;
+	
 #	else
-	//{
-		size_t 			writeFromOffset;
-		size_t 			sharedMemoryFileSize;
-	//}
+	
+	size_t          writeFromOffset;
+	size_t          sharedMemoryFileSize;
+	
 #	endif
+	
 
-//}
 #endif
 	
 };
@@ -363,7 +363,7 @@ typedef struct INode{
 #ifdef HAVE_STDATOMIC_H
 	_Atomic(size_t) mainNode;
 #else
-	size_t 			mainNode;
+	size_t          mainNode;
 #endif
 	
 }INode;
@@ -381,8 +381,7 @@ typedef struct INode{
 
 
 #if UPPER_LIMIT <= LOWER_LIMIT
-#	error 	Invalid range of possible characters.\
-			Reset UPPER_LIMIT and LOWER_LIMIT values.
+#	error 	Invalid range of possible characters. Reset UPPER_LIMIT and LOWER_LIMIT values.
 #endif
 
 
@@ -402,13 +401,13 @@ typedef struct INode{
 typedef struct CNode{
 	
 #if (LARGE_MEMORY_NEEDED && 1)
-	size_t		possibilities	[POSSIBLE_CHARACTERS];
+	size_t	 possibilities [POSSIBLE_CHARACTERS];
 #else
-	uint32_t 	possibilities	[POSSIBLE_CHARACTERS];
+	uint32_t possibilities [POSSIBLE_CHARACTERS];
 #endif
 	
-	bool 		isEndOfString;
-	uint8_t		flags;
+	bool     isEndOfString;
+	uint8_t  flags;
 	
 }CNode;
 
@@ -448,11 +447,11 @@ typedef struct CNode{
  **/
 enum
 {
-	ALLOW_PATH			= (uint8_t) 1 << 0,
-	DENY_PATH			= (uint8_t) 1 << 1,
-	SANDBOX_VIOLATION	= (uint8_t) 1 << 2,
-	SANDBOX_UNKNOWN		= (uint8_t) 1 << 3,
-	IS_PREFIX			= (uint8_t) 1 << 4
+	ALLOW_PATH        = (uint8_t) 1 << 0,
+	DENY_PATH         = (uint8_t) 1 << 1,
+	SANDBOX_VIOLATION = (uint8_t) 1 << 2,
+	SANDBOX_UNKNOWN	  = (uint8_t) 1 << 3,
+	IS_PREFIX         = (uint8_t) 1 << 4
 };
 
 
@@ -505,14 +504,14 @@ bool __dtsharedmemory_search(const char *path, uint8_t *flags);
  *	the file descriptor that is being used by either status file or
  *	shared memory file via dup2(2). Each process has a unique file descriptor
  *	for each of these files which is used throughout the process.
- *	If while installing the port, an attempt is being made to use our fds via 
- *	dup2(2) or close(2) tries to close our fd, this function resets the fd being used by 
+ *	If while installing the port, an attempt is being made to use our fds via
+ *	dup2(2) or close(2) tries to close our fd, this function resets the fd being used by
  *	status and shared memory file and the port can use the fd we were using before.
  *	Although there always will be a chance of us or port using the wrong fd ,like ,
  *	the fd has just been prepared by open(2) in __dtsharedmemory_set_manager() or
  *	__dtsharedmemory_reset_fd() and currently the Global(manager) doesn't know about it.
  *	In such a case the process may use that fd and problem may occur. This case has never occured
- *	with me while testing but is theoritically possible. 
+ *	with me while testing but is theoritically possible.
  *	TODO: A possible idea to fix this completely would be to keep some unique string in the start
  *	of the file which is checked after open(2) opens the file. In case when the file is first created,
  *	we can call fcntl() with F_GETPATH to check if the right file is opened. The F_GETPATH trick can be
