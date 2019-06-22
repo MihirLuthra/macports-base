@@ -48,22 +48,22 @@ namespace eval porttrace {
     # non-root installations, the current user, too). We're not prefixing the
     # path in /tmp with a separate macports-specific directory, because this
     # might not be writable by all users.
-    variable fifo_mktemp_template           "/tmp/macports-trace-XXXXXX"
+    variable fifo_mktemp_template "/tmp/macports-trace-XXXXXX"
+
+
+    ##
+    # These files are used as a communication medium between processes into which
+    # darwintrace library has been injected. 
+    variable darwintrace_sm_name
+    variable darwintrace_sm_status_name
 
 
     ##
     # dtsm is short for darwintrace shared memory
-    # These files are used as a communication medium between processes into which
-    # darwintrace library has been injected. 
-    variable dtsm_name
-    variable dtsm_status_name
-
-
-    ##
     # mktemp(3) templates for shared memory file and its status file
     #
-    variable dtsm_status_mktemp_template    "/tmp/macports-dtsm-status-XXXXXX"
-    variable dtsm_mktemp_template           "/tmp/macports-dtsm-XXXXXX"
+    variable darwintrace_sm_status_mktemp_template "/tmp/macports-dtsm-status-XXXXXX"
+    variable darwintrace_sm_mktemp_template        "/tmp/macports-dtsm-XXXXXX"
 
 
     ##
@@ -153,11 +153,11 @@ namespace eval porttrace {
         variable fifo
         variable fifo_mktemp_template
 
-        variable dtsm_name
-        variable dtsm_status_name
+        variable darwintrace_sm_name
+        variable darwintrace_sm_status_name
 
-        variable dtsm_status_mktemp_template
-        variable dtsm_mktemp_template
+        variable darwintrace_sm_status_mktemp_template
+        variable darwintrace_sm_mktemp_template
 
         if {[catch {package require Thread} error]} {
             ui_warn "Trace mode requires Tcl Thread package ($error)"
@@ -176,8 +176,8 @@ namespace eval porttrace {
         # Generate a name for shared memory file and its status file
         # through which processes into which darwintrace library is 
         # injected processes can communicate
-        set dtsm_status_name [mktemp $dtsm_status_mktemp_template]
-        set dtsm_name        [mktemp $dtsm_mktemp_template       ]
+        set darwintrace_sm_status_name [mktemp $darwintrace_sm_status_mktemp_template]
+        set darwintrace_sm_name        [mktemp $darwintrace_sm_mktemp_template       ]
 
         # Create the server-side of the trace socket; this will handle requests
         # from the traced processed.
@@ -194,11 +194,11 @@ namespace eval porttrace {
         }
         # Tell traced processes where to find their communication socket back
         # to this code.
-        set env(DARWINTRACE_LOG)    $fifo
+        set env(DARWINTRACE_LOG) $fifo
 
         # Tell traced processes the file name to use as shared memory and status
-        set env(DTSM_STATUS_NAME)   $dtsm_status_name
-        set env(DTSM_NAME)          $dtsm_name                 
+        set env(DARWINTRACE_SM_STATUS_NAME) $darwintrace_sm_status_name
+        set env(DARWINTRACE_SM_NAME)        $darwintrace_sm_name                 
 
 
         # The sandbox is limited to:
@@ -312,10 +312,10 @@ namespace eval porttrace {
             macosx_version
 
         variable fifo
-        variable dtsm_name
-        variable dtsm_status_name
+        variable darwintrace_sm_name
+        variable darwintrace_sm_status_name
 
-        foreach var {DYLD_INSERT_LIBRARIES DARWINTRACE_LOG DTSM_NAME DTSM_STATUS_NAME } {
+        foreach var {DYLD_INSERT_LIBRARIES DARWINTRACE_LOG DARWINTRACE_SM_NAME DARWINTRACE_SM_STATUS_NAME } {
             array unset env $var
         }
 
@@ -326,8 +326,8 @@ namespace eval porttrace {
         file delete -force $fifo
 
         # Delete the shared memory file and its status file
-        file delete -force $dtsm_status_name
-        file delete -force $dtsm_name
+        file delete -force $darwintrace_sm_status_name
+        file delete -force $darwintrace_sm_name
 
         # Delete the slave.
         delete_slave
