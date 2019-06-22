@@ -148,10 +148,10 @@ static void __darwintrace_setup_tls() {
  * Convenience getter function for the thread ID
  */
 /*
-static inline pthread_t __darwintrace_tid() {
-	return (pthread_t) pthread_getspecific(tid_key);
-}
-*/
+ static inline pthread_t __darwintrace_tid() {
+ return (pthread_t) pthread_getspecific(tid_key);
+ }
+ */
 
 /**
  * Convenience setter function for the thread-local darwintrace socket
@@ -171,12 +171,12 @@ static inline void __darwintrace_tid_set() {
 static inline bool __darwintrace_pathbeginswith(const char *str, const char *prefix) {
 	char s;
 	char p;
-
+	
 	/* '/' is the allow all wildcard */
 	if (prefix[0] == '\0' || (prefix[0] == '/' && prefix[1] == '\0')) {
 		return 1;
 	}
-
+	
 	do {
 		s = *str++;
 		p = *prefix++;
@@ -225,13 +225,13 @@ static inline char *__darwintrace_filemap_iter(char *command, filemap_iterator_t
 	enum { PATH, COMMAND, DONE } state = PATH;
 	char *t;
 	char *path;
-
+	
 	if (it == NULL || it->next == NULL || *it->next == '\0') {
 		return NULL;
 	}
-
+	
 	path = t = it->next;
-
+	
 	/* advance the cursor: if the number after the string is not 1, there's no
 	 * path behind it and we can advance by strlen(t) + 3. If it is 1, make
 	 * sure to skip the path, too.
@@ -261,7 +261,7 @@ static inline char *__darwintrace_filemap_iter(char *command, filemap_iterator_t
 		}
 		t++;
 	}
-
+	
 	it->next = t;
 	return path;
 }
@@ -276,7 +276,7 @@ static void __darwintrace_get_filemap() {
 	filemap_iterator_t it;
 	char *path, command;
 #endif
-
+	
 #if HAVE_DECL_ATOMIC_COMPARE_EXCHANGE_STRONG_EXPLICIT   /* HAVE_DECL_* is always defined and set to 1 or 0 */
 #	define CAS(old, new, mem) atomic_compare_exchange_strong_explicit(mem, old, new, memory_order_relaxed, memory_order_relaxed)
 #elif defined(HAVE_OSATOMICCOMPAREANDSWAPPTR)
@@ -294,7 +294,7 @@ static void __darwintrace_get_filemap() {
 #		error "No 32-bit compare and swap primitive available."
 #	endif
 #endif
-
+	
 	/*
 	 * ensure we have a filemap present; this might be called simultanously
 	 * from multiple threads and needs to work without leaking and in a way
@@ -311,10 +311,10 @@ static void __darwintrace_get_filemap() {
 			break;
 		newfilemap = __send("filemap\t", 8, 1);
 	} while (!CAS(&nullpointer, newfilemap, &filemap));
-
+	
 #if DARWINTRACE_DEBUG && 0
 	for (__darwintrace_filemap_iterator_init(&it);
-	        (path = __darwintrace_filemap_iter(&command, &it));) {
+	     (path = __darwintrace_filemap_iter(&command, &it));) {
 		debug_printf("filemap: {cmd=%d, path=%s}\n", command, path);
 	}
 #endif
@@ -339,50 +339,51 @@ void __darwintrace_close() {
 
 /**
  * This function needs to be called in every new process(except child processes) at
- * least once (thats the basic need but it gets called everytime 
+ * least once (thats the basic need but it gets called everytime
  * in __darwintrace_is_in_sandbox() and that doesn't make much difference cuz its already
- * handled in dtsharedmemory.c). 
+ * handled in dtsharedmemory.c).
  * It calls __dtsharedmemory_set_manager() which sets up
  * the global manager in dtsharedmemory.c to make insertions and
  * searches in the shared memory possible.
+ *
+ * \return true if manager was set successfully else return false
+ *
  */
 bool  __darwintrace_setup_dtsm()
 {
-    bool is_env_set = true;
-    bool did_set_dtsm_manager = false;
-
-    /**
-     * The file names for dtsm shared memory file and status file are set in
-     * porttrace.tcl and loaded into environment.
-     * No need to abort the execution if they are not set, dtsharedmemory is just
-     * a support to darwintrace lib for speedup
-     */
-    
-    if (__env_dtsm_status_name == NULL)
-    {
-        //fprintf(stderr, "darwintrace: trace library loaded, but DTSM_STATUS_NAME not set\n");
-        return false;
-    }
-
-    if (__env_dtsm_name == NULL)
-    {
-        //fprintf(stderr, "darwintrace: trace library loaded, but DTSM_NAME not set\n");
-        return false;
-    }
-
-    if (is_env_set)
-    {
-        did_set_dtsm_manager = __dtsharedmemory_set_manager(__env_dtsm_status_name, __env_dtsm_name);
-
-        if (!did_set_dtsm_manager)
-        {
-            fprintf(stderr, "darwintrace: Couldn't set dtsm manager\n");
-            return false;
-        }
-    }
-
-    return true;
-
+	bool is_env_set = true;
+	bool did_set_dtsm_manager = false;
+	
+	/**
+	 * The file names for dtsm shared memory file and status file are set in
+	 * porttrace.tcl and loaded into environment.
+	 * No need to abort the execution if they are not set, dtsharedmemory is just
+	 * a support to darwintrace lib for speedup
+	 */
+	
+	if (__env_dtsm_status_name == NULL)
+	{
+		return false;
+	}
+	
+	if (__env_dtsm_name == NULL)
+	{
+		return false;
+	}
+	
+	if (is_env_set)
+	{
+		did_set_dtsm_manager = __dtsharedmemory_set_manager(__env_dtsm_status_name, __env_dtsm_name);
+		
+		if (!did_set_dtsm_manager)
+		{
+			fprintf(stderr, "darwintrace: Couldn't set dtsm manager\n");
+			return false;
+		}
+	}
+	
+	return true;
+	
 }
 
 
@@ -401,7 +402,7 @@ void __darwintrace_setup() {
 	 * want to avoid mixing up the results from two calls in different threads
 	 * when reading from the socket.
 	 */
-
+	
 	/*
 	 * if the PID changed, close the current socket (which will force the
 	 * following code to re-open it).
@@ -410,31 +411,31 @@ void __darwintrace_setup() {
 		__darwintrace_close();
 		__darwintrace_pid = (pid_t) -1;
 	}
-
+	
 	/*
 	 * We don't need to watch for TID changes, because each thread has thread
 	 * local storage for the socket that will contain NULL when the socket has
 	 * not been initialized.
 	 */
-
+	
 	if (__darwintrace_sock() == NULL) {
 		int sock;
 		int sockflags;
 		FILE *stream;
 		struct sockaddr_un sun;
-
+		
 		__darwintrace_pid = getpid();
 		__darwintrace_tid_set();
 		if (__env_darwintrace_log == NULL) {
 			fprintf(stderr, "darwintrace: trace library loaded, but DARWINTRACE_LOG not set\n");
 			abort();
 		}
-
+		
 		if (-1 == (sock = socket(PF_LOCAL, SOCK_STREAM, 0))) {
 			perror("darwintrace: socket");
 			abort();
 		}
-
+		
 		/* Set the close-on-exec flag as early as possible after the socket
 		 * creation. On macOS, there is no way to do this race-condition free
 		 * unless you synchronize around creation and fork(2) -- however,
@@ -457,27 +458,27 @@ void __darwintrace_setup() {
 			perror("darwintrace: fcntl(F_SETFD, flags | FD_CLOEXEC)");
 			abort();
 		}
-
+		
 		if (strlen(__env_darwintrace_log) > sizeof(sun.sun_path) - 1) {
 			fprintf(stderr, "darwintrace: Can't connect to socket %s: name too long\n", __env_darwintrace_log);
 			abort();
 		}
 		sun.sun_family = AF_UNIX;
 		strlcpy(sun.sun_path, __env_darwintrace_log, sizeof(sun.sun_path));
-
+		
 		if (-1 == (connect(sock, (struct sockaddr *) &sun, sizeof(sun)))) {
 			perror("darwintrace: connect");
 			abort();
 		}
-
+		
 		if (NULL == (stream = fdopen(sock, "a+"))) {
 			perror("darwintrace: fdopen");
 			abort();
 		}
-
+		
 		/* store FILE * into thread local storage for the socket */
 		__darwintrace_sock_set(stream);
-
+		
 		/* request sandbox bounds */
 		__darwintrace_get_filemap();
 	}
@@ -494,7 +495,7 @@ void __darwintrace_setup() {
 static inline void __darwintrace_log_op(const char *op, const char *path) {
 	uint32_t size;
 	char logbuffer[BUFFER_SIZE];
-
+	
 	size = snprintf(logbuffer, sizeof(logbuffer), "%s\t%s", op, path);
 	// Check if the buffer was short. If it was, discard the message silently,
 	// assuming it isn't important enough to error out.
@@ -519,7 +520,7 @@ static int dependency_check(const char *path) {
 	uint32_t len;
 	int result = 0;
 	struct stat st;
-
+	
 	if (-1 == lstat(path, &st)) {
 		return 1;
 	}
@@ -527,7 +528,7 @@ static int dependency_check(const char *path) {
 		debug_printf("%s is directory\n", path);
 		return 1;
 	}
-
+	
 	len = snprintf(buffer, sizeof(buffer), "dep_check\t%s", path);
 	if (len >= sizeof(buffer)) {
 		fprintf(stderr, "darwintrace: truncating buffer length from %" PRIu32 " to %zu.", len, sizeof(buffer) - 1);
@@ -538,7 +539,7 @@ static int dependency_check(const char *path) {
 		fprintf(stderr, "darwintrace: dependency check failed for %s\n", path);
 		abort();
 	}
-
+	
 	switch (*p) {
 		case '+':
 			result = 1;
@@ -554,9 +555,9 @@ static int dependency_check(const char *path) {
 			abort();
 			/*NOTREACHED*/
 	}
-
+	
 	debug_printf("dependency_check: %s returned %d\n", path, result);
-
+	
 	free(p);
 	return result;
 }
@@ -586,12 +587,12 @@ static void frecv(void *restrict buf, size_t size) {
 			perror("darwintrace: read");
 			abort();
 		}
-
+		
 		if (res == 0) {
 			fprintf(stderr, "darwintrace: read: end-of-file\n");
 			abort();
 		}
-
+		
 		count += res;
 	}
 }
@@ -621,10 +622,83 @@ static void fsend(const void *restrict buf, size_t size) {
 			perror("darwintrace: write");
 			abort();
 		}
-
+		
 		count += res;
 	}
 }
+
+/**
+ *
+ * Wrapper function to abstract flag checking and searching in shared
+ * memory cache.
+ *
+ * \param[in] path path to be checked
+ * \return 1, if access should be granted, 0, if access should be denied, and
+ *         -1, if not found in cache
+ *
+ */
+int __darwintrace_sm_cache_check(const char *path, int flags)
+{
+	enum {NOT_FOUND = -1, DENY_ACCESS = 0, GRANT_ACCESS = 1};
+	
+	uint8_t cached_path_attributes;
+	bool found_in_dtsm = __dtsharedmemory_search(path, &cached_path_attributes);
+	
+#if DTSM_DEBUG && 1
+	/*
+         * This will print each time this func is called and
+         * to count the number of times these happens we can simply do `grep -c`.
+         * Like `cat <name>.log | grep -c "is_prefix"` will print the number of times
+         * prefixes were searched from the cache.
+         */
+	if (!found_in_dtsm)
+	{
+		fprintf(__darwintrace_stderr, "found_in_cache=false\n");
+	}	
+	else 
+	{
+		fprintf(__darwintrace_stderr, "found_in_cache=true\n");
+
+		if (cached_path_attributes & IS_PREFIX)
+		{
+                	fprintf(__darwintrace_stderr, "is_prefix\n");	
+		}
+        	else
+		{
+			fprintf(__darwintrace_stderr, "is_complete_path\n");
+		}
+        }
+#endif
+	
+	if (found_in_dtsm)
+	{
+		if ((flags & DT_REPORT) > 0)
+		{
+			if (cached_path_attributes & SANDBOX_VIOLATION)
+			{
+				__darwintrace_setup();
+				__darwintrace_log_op("sandbox_violation", path);
+				//As logging is done, remove SANDBOX_VIOLATION flag
+				uint8_t new_cached_path_attributes = cached_path_attributes & (~SANDBOX_VIOLATION);
+				__dtsharedmemory_insert(path, new_cached_path_attributes); 
+			}
+			else if (cached_path_attributes & SANDBOX_UNKNOWN)
+			{
+				__darwintrace_setup();
+				__darwintrace_log_op("sandbox_unknown", path);
+				//As logging is done, remove SANDBOX_UNKNOWN flag
+				uint8_t new_cached_path_attributes = cached_path_attributes & (~SANDBOX_UNKNOWN);
+                                __dtsharedmemory_insert(path, new_cached_path_attributes);
+			}
+		}
+		
+		return (cached_path_attributes & ALLOW_PATH) ? GRANT_ACCESS : DENY_ACCESS;
+	}
+	
+	return NOT_FOUND;
+}
+
+
 
 /**
  * Communication wrapper targeting tracelib. Automatically enforces the on-wire
@@ -640,23 +714,23 @@ static void fsend(const void *restrict buf, size_t size) {
 static char *__send(const char *buf, uint32_t len, int answer) {
 	fsend(&len, sizeof(len));
 	fsend(buf, len);
-
+	
 	if (!answer) {
 		return NULL;
 	}
-
+	
 	uint32_t recv_len = 0;
 	char *recv_buf;
-
+	
 	frecv(&recv_len, sizeof(recv_len));
 	if (recv_len == 0) {
 		return 0;
 	}
-
+	
 	recv_buf = malloc(recv_len + 1);
 	recv_buf[recv_len] = '\0';
 	frecv(recv_buf, recv_len);
-
+	
 	return recv_buf;
 }
 
@@ -679,148 +753,165 @@ static char *__send(const char *buf, uint32_t len, int answer) {
  *         should be denied
  */
 static inline bool __darwintrace_sandbox_check(const char *path, int flags) {
+	
+	
+	//Make the socket connection
+	__darwintrace_setup();
+	
+	if (!filemap)
+		return true;
+	
 	filemap_iterator_t filemap_it;
-
+	
 	char command = -1;
 	char *t;
-    bool inserted_in_dtsm;
-
-    /*
-     * insertions to shared memory cache need not be always successful.
-     * It only allows most frequently occuring characters.
-     * Also, insertions are unsuccessful in rare cases and if that's not the case
-     * changes should be made.
-     * See LOWER_LIMIT, UPPER_LIMIT & POSSIBLE_CHARACTERS in dtsharedmemory.h
-     */
-
-
-	if (path[0] == '/' && path[1] == '\0') {
-		// Always allow access to /. Strange things start to happen if you deny this.
-
-        //Store in shared memory cache
-        inserted_in_dtsm = __dtsharedmemory_insert(path, ALLOW_PATH);
-        if (!inserted_in_dtsm)
-            debug_printf("__dtsharedmemory_insert() failed for path %s\n", path);
-
-        return true;
-
-	}
-	 
-
+	
+	bool inserted_in_dtsm;
+	bool belongs_to_a_known_prefix = false;
+	const char *path_to_be_cached;
+	uint8_t cached_path_attributes;
+	
+	
 	// Iterate over the sandbox bounds and try to find a directive matching this path
 	for (__darwintrace_filemap_iterator_init(&filemap_it);
-	        (t = __darwintrace_filemap_iter(&command, &filemap_it));) {
-		if (__darwintrace_pathbeginswith(path, t)) {
+	     (t = __darwintrace_filemap_iter(&command, &filemap_it));) {
+		
+		if ( (belongs_to_a_known_prefix = __darwintrace_pathbeginswith(path, t)) ) {
+		
 			switch (command) {
-				case FILEMAP_ALLOW:
 					
-                    //Store in shared memory cache
-                    inserted_in_dtsm = __dtsharedmemory_insert(t, ALLOW_PATH | IS_PREFIX);
-                    if (!inserted_in_dtsm)
-                        debug_printf("__dtsharedmemory_insert() failed for path prefix %s\n", t);
-                    
-                    return true;
+				case FILEMAP_ALLOW:
 
+					path_to_be_cached = t;
+					cached_path_attributes = ALLOW_PATH | IS_PREFIX;
+					
+					break;
+					
 				case FILEMAP_ASK:
-
+					
 					// ask the socket whether this file is OK
 					switch (dependency_check(path)) {
 						case 1:
-						    
-                            //Store in shared memory cache
-                            inserted_in_dtsm = __dtsharedmemory_insert(path, ALLOW_PATH);
-							if (!inserted_in_dtsm)
-                                debug_printf("__dtsharedmemory_insert() failed for path %s\n", path);
-                            
-                            return true;
-
+							
+							cached_path_attributes = ALLOW_PATH;
+							
+							break;
+							
 						case -1:
 							// if the file isn't known to MacPorts, allow
 							// access anyway, but report a sandbox violation.
 							// TODO find a better solution
+							cached_path_attributes = ALLOW_PATH;
+							
+							// If DT_REPORT wasn't specified, logging won't be done
+							// If the path is found via a cache hit next time,
+							// cache should be aware to tell the syscall that it needs to
+							// do logging for this path as sandbox_unknown
+							
 							if ((flags & DT_REPORT) > 0) {
 								__darwintrace_log_op("sandbox_unknown", path);
+							} else {
+								cached_path_attributes |= SANDBOX_UNKNOWN;
 							}
-
-                            //If DT_REPORT wasn't specified, logging won't be done
-                            //If the same path is accessed later when DT_REPORT was specified,
-                            //this path has to get logged coz of which SANDBOX_UNKNOWN is specified
-							if ((flags & DT_REPORT) > 0)
-                                inserted_in_dtsm = __dtsharedmemory_insert(path, ALLOW_PATH);
-                            else
-                                inserted_in_dtsm = __dtsharedmemory_insert(path, ALLOW_PATH | SANDBOX_UNKNOWN);
-                            
-                            if (!inserted_in_dtsm)
-                                debug_printf("__dtsharedmemory_insert() failed for path %s\n", path);
 							
-                            return true;
-
+							break;
+							
 						case 0:
 							// file belongs to a foreign port, deny access
+							
+							cached_path_attributes = DENY_PATH;
+							
+							// If DT_REPORT wasn't specified, logging won't be done
+							// If the path is found via a cache hit next time,
+							// cache should be aware to tell the syscall that it needs to
+							// do logging for this path as sandbox_violation
+							
 							if ((flags & DT_REPORT) > 0) {
 								__darwintrace_log_op("sandbox_violation", path);
+							} else {
+								cached_path_attributes |= SANDBOX_VIOLATION;
 							}
-
-                            //Store in shared memory cache
-
-                            //If DT_REPORT wasn't specified, logging won't be done
-                            //If the same path is accessed later when DT_REPORT was specified,
-                            //this path has to get logged coz of which SANDBOX_VIOLATION is specified
-                            
-                            if ((flags & DT_REPORT) > 0) 
-                                inserted_in_dtsm = __dtsharedmemory_insert(path, DENY_PATH);
-                            else
-                                inserted_in_dtsm = __dtsharedmemory_insert(path, DENY_PATH | SANDBOX_VIOLATION); 
-
-                            return false;
+							
+							break;
 							
 					}
+					
+					break;
+
 				case FILEMAP_DENY:
-
-
+					
+					path_to_be_cached = path;
+					cached_path_attributes = DENY_PATH | IS_PREFIX;
+					
+					// If DT_REPORT wasn't specified, logging won't be done
+					// If the path is found via a cache hit next time,
+					// cache should be aware to tell the syscall that it needs to
+					// do logging for this path as sandbox_violation
 					if ((flags & DT_REPORT) > 0) {
 						__darwintrace_log_op("sandbox_violation", path);
+					} else {
+						cached_path_attributes |= SANDBOX_VIOLATION;
 					}
-
-                    //Store in shared memory cache
-                    
-                    //If DT_REPORT wasn't specified, logging won't be done
-                    //If the same path is accessed later when DT_REPORT was specified,
-                    //this path has to get logged coz of which SANDBOX_VIOLATION is specified
-                            
-                    if ((flags & DT_REPORT) > 0)
-                        inserted_in_dtsm = __dtsharedmemory_insert(path, DENY_PATH | IS_PREFIX);
-                    else
-                        inserted_in_dtsm = __dtsharedmemory_insert(path, DENY_PATH | IS_PREFIX | SANDBOX_VIOLATION);
-                    return false;
-
+					
+					break;
 				default:
 					fprintf(stderr, "darwintrace: error: unexpected byte in file map: `%x'\n", *t);
 					abort();
 			}
+			
+			break;
 		}
 	}
+	
+	
+	if ( belongs_to_a_known_prefix == false )
+	{
+		path_to_be_cached = path;
+		cached_path_attributes = DENY_PATH;
+		
+		if ((flags & DT_REPORT) > 0) {
+			__darwintrace_log_op("sandbox_violation", path);
+		} else {
+			cached_path_attributes |= SANDBOX_VIOLATION;
+		}
+	}
+	
+	inserted_in_dtsm = __dtsharedmemory_insert(path_to_be_cached, cached_path_attributes);
+	
+#if DTSM_DEBUG && 1
+	/*
+	 * insertions to shared memory cache need not be always successful.
+	 * It only allows most frequently occuring characters.
+	 * Also, insertions are unsuccessful in rare cases and if that's not the case
+	 * changes should be made.
+	 * See LOWER_LIMIT, UPPER_LIMIT & POSSIBLE_CHARACTERS in dtsharedmemory.h
+	 */
+	if (!inserted_in_dtsm)
+		fprintf(__darwintrace_stderr, "__dtsharedmemory_insert() failed for path %s\n", path_to_be_cached);
 
-
-	if ((flags & DT_REPORT) > 0) {
-		__darwintrace_log_op("sandbox_violation", path);
+	/*
+	 * This will print everytime this func is called and
+	 * to count the number of times these happens we can simply do `grep -c`.
+	 * Like `cat <name>.log | grep -c "IS_PREFIX"` will print the number of times
+	 * prefixes were inserted into the cache.
+	 */
+	if (cached_path_attributes & IS_PREFIX)
+	{
+		fprintf(__darwintrace_stderr, "IS_PREFIX\n");
+	}
+	else
+	{
+		if (belongs_to_a_known_prefix)
+			fprintf(__darwintrace_stderr, "QUERIED_REGISTRY\n");
+		else
+			fprintf(__darwintrace_stderr, "PREFIX_NOT_KNOWN\n");
 	}
 
-    //Store in shared memory cache
-
-    //If DT_REPORT wasn't specified, logging won't be done
-    //If the same path is accessed later when DT_REPORT was specified,
-    //this path has to get logged coz of which SANDBOX_VIOLATION is specified
-
-    if ((flags & DT_REPORT) > 0)
-        inserted_in_dtsm = __dtsharedmemory_insert(path, DENY_PATH);
-    else
-        inserted_in_dtsm = __dtsharedmemory_insert(path, DENY_PATH | SANDBOX_VIOLATION);
-
-    if (!inserted_in_dtsm)
-        debug_printf("__dtsharedmemory_insert() failed for path %s\n", path);
-    
-    return false;
+#endif
+	
+	
+	return (cached_path_attributes & ALLOW_PATH) ? true : false;
+	
 }
 
 /**
@@ -841,39 +932,40 @@ static inline bool __darwintrace_sandbox_check(const char *path, int flags) {
  *         should be denied
  */
 bool __darwintrace_is_in_sandbox(const char *path, int flags) {
-
-    bool did_set_dtsm_manager = __darwintrace_setup_dtsm();
-
-    if (!did_set_dtsm_manager)
-    //Couldn't setup shared memory, check if preparations can be made for asking socket
-    {
-        __darwintrace_setup();
-
-        if (!filemap)
-            return true;
-    }	
-
-    bool found_in_dtsm = false, dt_path_permission;
-    uint8_t dtsm_flags;
-
+	
+	if (path == NULL || *path == '\0') {
+	// this is most certainly invalid, let the syscall deal with it
+		return true;
+	}
+	
+	if (path[0] == '/' && path[1] == '\0') {
+	// Always allow access to /. Strange things start to happen if you deny this.
+		return true;
+		
+	}
+	
+	bool did_set_dtsm_manager = __darwintrace_setup_dtsm();
+	
+	if (!did_set_dtsm_manager)
+		return true;
+	
+	bool dt_path_permission;
+	int result;
+	
 	typedef struct {
 		char *start;
 		size_t len;
 	} path_component_t;
-
+	
 	char normPath[MAXPATHLEN];
 	normPath[0] = '/';
 	normPath[1] = '\0';
-
+	
 	path_component_t pathComponents[MAXPATHLEN / 2 + 2];
 	size_t numComponents = 0;
-
+	
+	
 	// Make sure the path is absolute.
-	if (path == NULL || *path == '\0') {
-		// this is most certainly invalid, let the syscall deal with it
-		return true;
-	}
-
 	char *dst = NULL;
 	const char *token = NULL;
 	size_t idx;
@@ -881,7 +973,7 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 		/*
 		 * The path isn't absolute, start by populating pathcomponents with the
 		 * current working directory.
-		 * 
+		 *
 		 * However, we avoid getcwd(3) if we can and use getattrlist(2) with
 		 * ATTR_CMN_FULLPATH instead, because getcwd(3) will open all parent
 		 * directories, read them, search for the current component using its
@@ -898,10 +990,10 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 		attrlist.dirattr = 0;
 		attrlist.fileattr = 0;
 		attrlist.forkattr = 0;
-
+		
 		char attrbuf[sizeof(uint32_t) + sizeof(attrreference_t) + (PATH_MAX + 1)];
 		/*           attrlength         attrref_t for the name     UTF-8 name up to PATH_MAX chars */
-
+		
 		// FIXME This sometimes violates the stack canary
 		if (-1 == (getattrlist(".", &attrlist, attrbuf, sizeof(attrbuf), FSOPT_NOFOLLOW))) {
 			perror("darwintrace: getattrlist");
@@ -915,14 +1007,14 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 			abort();
 		}
 #		endif /* defined(ATTR_CMN_FULLPATH) */
-
+		
 		char *writableToken = normPath + 1;
 		while ((idx = strcspn(writableToken, "/")) > 0) {
 			// found a token, tokenize and store it
 			pathComponents[numComponents].start = writableToken;
 			pathComponents[numComponents].len   = idx;
 			numComponents++;
-
+			
 			bool final = writableToken[idx] == '\0';
 			writableToken[idx] = '\0';
 			if (final) {
@@ -931,7 +1023,7 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 			// advance token
 			writableToken += idx + 1;
 		}
-
+		
 		// copy path after the CWD into the buffer and normalize it
 		if (numComponents > 0) {
 			path_component_t *lastComponent = pathComponents + (numComponents - 1);
@@ -939,7 +1031,7 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 		} else {
 			dst = normPath + 1;
 		}
-
+		
 		// continue parsing at the begin of path
 		token = path;
 	} else {
@@ -948,13 +1040,13 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 		*dst = '\0';
 		token = path + 1;
 	}
-
+	
 	/* Make sure the path is normalized. NOTE: Do _not_ use realpath(3) here.
 	 * Doing so _will_ lead to problems. This is essentially a very simple
 	 * re-implementation of realpath(3). */
 	while ((idx = strcspn(token, "/")) > 0) {
 		// found a token, process it
-
+		
 		if (token[0] == '\0' || token[0] == '/') {
 			// empty entry, ignore
 		} else if (token[0] == '.' && (token[1] == '\0' || token[1] == '/')) {
@@ -980,28 +1072,28 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 			pathComponents[numComponents].start = dst;
 			pathComponents[numComponents].len   = idx;
 			numComponents++;
-
+			
 			// advance destination
 			dst += idx + 1;
 		}
-
+		
 		if (token[idx] == '\0') {
 			break;
 		}
 		token += idx + 1;
 	}
-
+	
 	// strip off resource forks
 	if (numComponents >= 2 &&
-		strcmp("..namedfork", pathComponents[numComponents - 2].start) == 0 &&
-		strcmp("rsrc", pathComponents[numComponents - 1].start) == 0) {
+	    strcmp("..namedfork", pathComponents[numComponents - 2].start) == 0 &&
+	    strcmp("rsrc", pathComponents[numComponents - 1].start) == 0) {
 		numComponents -= 2;
 	}
-
+	
 #	ifdef ATTR_CMN_FULLPATH
 	if (numComponents >= 3 && strncmp(".vol", pathComponents[0].start, pathComponents[0].len) == 0) {
 		// path in VOLFS, try to get inode -> name lookup from getattrlist(2).
-
+		
 		// Add the slashes and the terminating \0
 		for (size_t i = 0; i < numComponents; ++i) {
 			if (i == numComponents - 1) {
@@ -1010,7 +1102,7 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 				pathComponents[i].start[pathComponents[i].len] = '/';
 			}
 		}
-
+		
 		struct attrlist attrlist;
 		attrlist.bitmapcount = ATTR_BIT_MAP_COUNT;
 		attrlist.reserved = 0;
@@ -1019,17 +1111,17 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 		attrlist.dirattr = 0;
 		attrlist.fileattr = 0;
 		attrlist.forkattr = 0;
-
+		
 		char attrbuf[sizeof(uint32_t) + sizeof(attrreference_t) + (PATH_MAX + 1)];
 		/*           attrlength         attrref_t for the name     UTF-8 name up to PATH_MAX chars */
-
+		
 		if (-1 == (getattrlist(normPath, &attrlist, attrbuf, sizeof(attrbuf), FSOPT_NOFOLLOW))) {
 			perror("darwintrace: getattrlist");
 			// ignore and just return the /.vol/ path
 		} else {
 			attrreference_t *nameAttrRef = (attrreference_t *) (attrbuf + sizeof(uint32_t));
 			strlcpy(normPath, ((char *) nameAttrRef) + nameAttrRef->attr_dataoffset, sizeof(normPath));
-
+			
 			numComponents = 0;
 			char *writableToken = normPath + 1;
 			while ((idx = strcspn(writableToken, "/")) > 0) {
@@ -1037,7 +1129,7 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 				pathComponents[numComponents].start = writableToken;
 				pathComponents[numComponents].len   = idx;
 				numComponents++;
-
+				
 				bool final = writableToken[idx] == '\0';
 				writableToken[idx] = '\0';
 				if (final) {
@@ -1049,12 +1141,12 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 		}
 	}
 #	endif
-
+	
 	bool pathIsSymlink;
 	size_t loopCount = 0;
 	do {
 		pathIsSymlink = false;
-
+		
 		// Add the slashes and the terminating \0
 		for (size_t i = 0; i < numComponents; ++i) {
 			if (i == numComponents - 1) {
@@ -1063,83 +1155,49 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 				pathComponents[i].start[pathComponents[i].len] = '/';
 			}
 		}
-
-        //If DT_ALLOWDIR is set and path is a dir, return true
-        //Before this check was in __darwintrace_sandbox_check().
-        //Moved here because this would avoid lots of cache misses
-        //and unnecessary calls to __darwintrace_setup()
-        if ((flags & DT_ALLOWDIR) > 0) {
-
-            struct stat st;
-            if (-1 != lstat(normPath, &st) && S_ISDIR(st.st_mode))
-                return true;
-
-        }
-
+		
+		//If DT_ALLOWDIR is set and path is a dir, return true
+		//Before this check was in __darwintrace_sandbox_check().
+		//Moved here because this would avoid lots of cache misses
+		//and unnecessary calls to __darwintrace_setup()
+		if ((flags & DT_ALLOWDIR) > 0) {
+			
+			struct stat st;
+			if (-1 != lstat(normPath, &st) && S_ISDIR(st.st_mode))
+				return true;
+			
+		}
+		
 		if ((flags & DT_FOLLOWSYMS) == 0) {
 			// only expand symlinks when the DT_FOLLOWSYMS flags is set;
 			// otherwise just ignore whether this path is a symlink or not to
 			// speed up readdir(3).
 			break;
 		}
-
+		
 		if (++loopCount >= 10) {
 			// assume cylce and let the OS deal with that (yes, this actually
 			// happens in software!)
 			break;
 		}
-
+		
 		// Check whether the last component is a symlink; if it is, check
 		// whether it is in the sandbox, expand it and do the same thing again.
 		struct stat st;
 		//debug_printf("checking for symlink: %s\n", normPath);
 		if (lstat(normPath, &st) != -1 && S_ISLNK(st.st_mode)) {
-
-            //Check shared memory for path
-            if (did_set_dtsm_manager)
-				found_in_dtsm = __dtsharedmemory_search(normPath, &dtsm_flags);
- 
-#if DTSM_DEBUG && 1
-            found_in_dtsm ? fprintf(stderr, "found_in_dtsm=true\n") : fprintf(stderr, "found_in_dtsm=false for %s\n", normPath);
-#endif
-
-            if (found_in_dtsm)
-            {
-                dt_path_permission = (dtsm_flags & ALLOW_PATH) ? true : false;
-               
-                if ((flags & DT_REPORT) > 0) 
-                {
-                    if (dtsm_flags & SANDBOX_VIOLATION)
-                    {
-                        __darwintrace_setup();
-                        __darwintrace_log_op("sandbox_violation", normPath);
-                    }
-                    else
-                    if (dtsm_flags & SANDBOX_UNKNOWN)
-                    {
-                        __darwintrace_setup();
-                        __darwintrace_log_op("sandbox_unknown", normPath);
-                    }
-                }
-                
-            }
-            else
-            //Not found in shared memory cache, ask the server
-            {
-                __darwintrace_setup();
-
-                if (!filemap)
-                    return true;
-
-                dt_path_permission = __darwintrace_sandbox_check(normPath, flags);
-            }
-
-            if (!dt_path_permission)
-                return false;
-
+			
+			if ( (result = __darwintrace_sm_cache_check(normPath, flags))	!= -1)
+				dt_path_permission = (bool)result;
+			else
+				dt_path_permission = __darwintrace_sandbox_check(normPath, flags);
+			
+			if (!dt_path_permission)
+				return false;
+			
 			char link[MAXPATHLEN];
 			pathIsSymlink = true;
-
+			
 			ssize_t linksize;
 			if (-1 == (linksize = readlink(normPath, link, sizeof(link)))) {
 				perror("darwintrace: readlink");
@@ -1147,7 +1205,7 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 			}
 			link[linksize] = '\0';
 			//debug_printf("readlink(%s) = %s\n", normPath, link);
-
+			
 			if (*link == '/') {
 				// symlink is absolute, start fresh
 				numComponents = 0;
@@ -1168,10 +1226,10 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 					}
 				}
 			}
-
+			
 			while ((idx = strcspn(token, "/")) > 0) {
 				// found a token, process it
-
+				
 				if (token[0] == '\0' || token[0] == '/') {
 					// empty entry, ignore
 				} else if (token[0] == '.' && (token[1] == '\0' || token[1] == '/')) {
@@ -1197,11 +1255,11 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 					pathComponents[numComponents].start = dst;
 					pathComponents[numComponents].len   = idx;
 					numComponents++;
-
+					
 					// advance destination
 					dst += idx + 1;
 				}
-
+				
 				if (token[idx] == '\0') {
 					break;
 				}
@@ -1209,44 +1267,11 @@ bool __darwintrace_is_in_sandbox(const char *path, int flags) {
 			}
 		}
 	} while (pathIsSymlink);
-
-    //Check shared memory cache for path
-    if (did_set_dtsm_manager)
-		found_in_dtsm = __dtsharedmemory_search(normPath, &dtsm_flags);
- 
-#if DTSM_DEBUG && 1
-    found_in_dtsm ? fprintf(stderr, "found_in_dtsm=true\n") : fprintf(stderr, "found_in_dtsm=false for %s\n", normPath);
-#endif
-
-    if (found_in_dtsm)
-    {
-        dt_path_permission = (dtsm_flags & ALLOW_PATH) ? true : false;
-
-        if ((flags & DT_REPORT) > 0)
-        {   
-            if (dtsm_flags & SANDBOX_VIOLATION)
-            {   
-                __darwintrace_setup();
-                __darwintrace_log_op("sandbox_violation", normPath);
-            }
-            else
-            if (dtsm_flags & SANDBOX_UNKNOWN)
-            {   
-                __darwintrace_setup();
-                __darwintrace_log_op("sandbox_unknown", normPath);
-            }
-        }
-    }
-    else
-    //Not found in shared memory, ask the server
-    {
-        __darwintrace_setup();
-
-        if (!filemap)
-            return true;
-
-        dt_path_permission = __darwintrace_sandbox_check(normPath, flags);
-    }
-
+	
+	if ( (result = __darwintrace_sm_cache_check(normPath, flags))	!= -1)
+		dt_path_permission = (bool)result;
+	else
+		dt_path_permission = __darwintrace_sandbox_check(normPath, flags);
+	
 	return dt_path_permission;
 }
