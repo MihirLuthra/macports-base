@@ -789,6 +789,8 @@ static inline bool __darwintrace_sandbox_check(const char *path, int flags) {
 					
 				case FILEMAP_ASK:
 					
+					path_to_be_cached = path;
+					
 					// ask the socket whether this file is OK
 					switch (dependency_check(path)) {
 						case 1:
@@ -840,7 +842,7 @@ static inline bool __darwintrace_sandbox_check(const char *path, int flags) {
 
 				case FILEMAP_DENY:
 					
-					path_to_be_cached = path;
+					path_to_be_cached = t;
 					cached_path_attributes = DENY_PATH | IS_PREFIX;
 					
 					// If DT_REPORT wasn't specified, logging won't be done
